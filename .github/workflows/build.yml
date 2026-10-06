@@ -15,7 +15,10 @@ on:
 jobs:
   build:
     name: Build Magisk artifacts
-    runs-on: macos-26
+    # macos-26 runners hit a deterministic protobuf-codegen panic in the
+    # magiskboot build script ("byte range starts at 8 but ends at 7",
+    # 2026-10-06, two attempts); the same commit builds clean on ubuntu.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
     steps:
