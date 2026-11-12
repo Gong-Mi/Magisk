@@ -126,9 +126,20 @@ impl MagiskD {
                 key: "to.uid",
                 value: Int(request.target_uid),
             },
+            // Always send pid = 0. With pid > 0 and a shared-UID caller, the
+            // manager resolves the caller via RootUtils.getAppProcess(pid),
+            // whose obj/fs getters block in Connection.await()
+            // (acquireSharedInterruptibly(1), no timeout, f2c15c770). A failed
+            // libsu RootService bind parks every Binder worker serving
+            // Provider.call forever, and the bind handshake broadcast needs
+            // the same pool, so the wait cannot clear itself. pid <= 0 makes
+            // XAndroid.getPackageInfo return null at its pid guard without
+            // touching RootUtils; SuCallbackHandler then takes its existing
+            // createSuLog(uid, ...) / "[UID] x" fallback and the log still
+            // lands. Same method and extra keys — protocol unchanged.
             Extra {
                 key: "pid",
-                value: Int(cred.pid.unwrap_or(-1).as_()),
+                value: Int(0),
             },
             Extra {
                 key: "policy",
