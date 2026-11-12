@@ -3,7 +3,7 @@ use crate::daemon::{AID_APP_START, AID_ROOT, MagiskD, to_app_id, to_user_id};
 use crate::db::{DbSettings, MultiuserMode};
 use crate::ffi::{SuPolicy, SuRequest, exec_root_shell};
 use crate::socket::IpcRead;
-use base::{LoggedResult, ResultExt, WriteExt, debug, error, exit_on_error, libc, warn};
+use base::{LoggedResult, ResultExt, WriteExt, debug, error, exit_on_error, info, libc, warn};
 use std::os::fd::IntoRawFd;
 use std::os::unix::net::{UCred, UnixStream};
 use std::sync::Arc;
@@ -98,6 +98,23 @@ impl MagiskD {
         };
 
         let info = self.get_su_info(cred.uid as i32);
+
+        // The manager notify now carries pid=0 (see connect.rs) to keep the
+        // official manager's Binder pool out of the unbounded RootUtils
+        // wait, which also drops the pid from the manager's su log UI.
+        // Record the real pid here at the source instead, gated by the same
+        // policies logging flag the manager uses for its DB insert, covering
+        // both allow and deny outcomes.
+        if info.settings.log {
+            info!(
+                "su: uid=[{}] pid=[{}] target=[{}] policy=[{}] cmd=[{}]",
+                cred.uid,
+                cred.pid.unwrap_or(-1),
+                req.target_uid,
+                info.settings.policy.repr,
+                req.command.join(" ")
+            );
+        }
 
         // Talk to su manager
         self.notify_app(&cred, &info, &req);
